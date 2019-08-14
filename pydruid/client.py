@@ -24,6 +24,27 @@ from six.moves import urllib
 from pydruid.query import QueryBuilder
 from base64 import b64encode
 
+from pydruid.qiniu_auth import Auth
+from requests.structures import CaseInsensitiveDict
+import platform
+
+_USER_AGENT = 'pandora-cube-sdk-python/{0}({1}/{2}/{3};{4})'.format("0.0.1", platform.system(), platform.release(), platform.machine(), platform.python_version())
+
+class Request(object):
+    def __init__(self, method, url,
+                 data=None,
+                 headers=None):
+        self.method = method
+        self.url = url
+        self.data = data
+
+        if not isinstance(headers, CaseInsensitiveDict):
+            self.headers = CaseInsensitiveDict(headers)
+        else:
+            self.headers = headers
+
+        if 'User-Agent' not in self.headers:
+            self.headers['User-Agent'] = _USER_AGENT
 
 # extract error from the <PRE> tag inside the HTML response
 HTML_ERROR = re.compile("<pre>\\s*(.*?)\\s*</pre>", re.IGNORECASE)
@@ -37,10 +58,14 @@ class BaseDruidClient(object):
         self.username = None
         self.password = None
         self.proxies = None
+        self.auth = None
 
     def set_basic_auth_credentials(self, username, password):
         self.username = username
         self.password = password
+
+    def set_qiniu(self, ak, sk):
+        self.auth = Auth(ak, sk)
 
     def set_proxies(self, proxies):
         self.proxies = proxies
@@ -54,11 +79,17 @@ class BaseDruidClient(object):
             url = self.url + self.endpoint
         else:
             url = self.url + "/" + self.endpoint
+            if (self.username is not None) and (self.password is not None):
+                authstring = "{}:{}".format(self.username, self.password)
+                b64string = b64encode(authstring.encode()).decode()
+                headers["Authorization"] = "Basic {}".format(b64string)
         headers = {"Content-Type": "application/json"}
-        if (self.username is not None) and (self.password is not None):
-            authstring = "{}:{}".format(self.username, self.password)
-            b64string = b64encode(authstring.encode()).decode()
-            headers["Authorization"] = "Basic {}".format(b64string)
+        if self.auth != None:
+            req = Request("POST", url, querystr, headers)
+            self.auth.sign_request(req)
+            headers = req.headers
+        else:
+            pass
 
         return headers, querystr, url
 

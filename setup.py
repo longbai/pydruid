@@ -22,7 +22,7 @@ with io.open('README.md', encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
-    name='pydruid',
+    name='pydruid-qiniu',
     version='0.999.0dev',
     author='Druid Developers',
     author_email='druid-development@googlegroups.com',
